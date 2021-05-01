@@ -25,7 +25,7 @@ jobs:
     steps:
       - docker-build:
           image_name: lts-016-023-upgrade
-          path: "./bin/migration-scripts/lts-to-lts/0.16-to-0.23/playbooks/"
+          path: "./migrations/scripts/lts-to-lts/0.16-to-0.23/playbooks/"
 
   push-lts-upgrade:
     executor: docker-executor
