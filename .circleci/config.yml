@@ -20,19 +20,33 @@ jobs:
           name: Lint the Astronomer chart
           command: export PATH=/tmp/bin:$PATH make lint
 
-  build-lts-upgrade:
+  build-lts-16-to-23-upgrade:
     executor: docker-executor
     steps:
       - docker-build:
           image_name: lts-016-023-upgrade
           path: "./migrations/scripts/lts-to-lts/0.16-to-0.23/playbooks/"
 
-  push-lts-upgrade:
+  build-lts-23-to-25-upgrade:
+    executor: docker-executor
+    steps:
+      - docker-build:
+          image_name: lts-023-025-upgrade
+          path: "./migrations/scripts/lts-to-lts/0.23-to-0.25/playbooks/"
+
+  push-lts-16-to-23-upgrade:
     executor: docker-executor
     steps:
       - push-to-quay-io:
           comma_separated_tags: "latest,$CIRCLE_BUILD_NUM"
           image_name: lts-016-023-upgrade
+
+  push-lts-23-to-25-upgrade:
+    executor: docker-executor
+    steps:
+      - push-to-quay-io:
+          comma_separated_tags: "latest,$CIRCLE_BUILD_NUM"
+          image_name: lts-023-025-upgrade
 
   unittest-charts:
     docker:
@@ -119,14 +133,14 @@ jobs:
       - helm-install:
           astronomer-tags: "platform postgresql monitoring logging kubed keda"
 
-  lts-upgrade-0-23-test:
+  lts-lts-16-to-23-test:
     machine:
       image: ubuntu-2004:202101-01
       resource_class: xlarge
     environment:
       KUBE_VERSION: v1.18.15
     steps:
-      - upgrade-0-23-test
+      - lts-16-to-23-test
 
 workflows:
   version: 2.1
@@ -136,14 +150,14 @@ workflows:
       - approve-lts-upgrader-build:
           type: approval
 
-      - build-lts-upgrade:
+      - build-lts-16-to-23-upgrade:
           requires:
             - lint
             - approve-lts-upgrader-build
 
-      - lts-upgrade-0-23-test:
+      - lts-lts-16-to-23-test:
           requires:
-            - build-lts-upgrade
+            - build-lts-16-to-23-upgrade
 
       - approve-lts-upgrader-release:
           type: approval
@@ -157,7 +171,7 @@ workflows:
       - push-lts-upgrade:
           requires:
             - approve-lts-upgrader-release
-            - lts-upgrade-0-23-test
+            - lts-lts-16-to-23-test
           context:
             - quay.io
           filters:
@@ -311,8 +325,8 @@ commands:
           paths:
             - "./<< parameters.image_name >>.tar"
 
-  upgrade-0-23-test:
-    description: "Test LTS to LTS upgrade automation"
+  lts-16-to-23-test:
+    description: "Test LTS 16 to 23 upgrade automation"
     steps:
       - checkout
       - attach_workspace:
@@ -324,7 +338,22 @@ commands:
           name: Test lts to lts upgrade automation
           command: |
             set -e
-            bin/lts-upgrade-0-23-test
+            bin/lts-16-to-23-test
+
+  lts-23-to-25-test:
+    description: "Test LTS 23 to 25 upgrade automation"
+    steps:
+      - checkout
+      - attach_workspace:
+          at: /tmp/workspace
+      - run:
+          name: Load archived Docker image
+          command: docker load -i /tmp/workspace/lts-023-025-upgrade.tar
+      - run:
+          name: Test lts to lts upgrade automation
+          command: |
+            set -e
+            bin/lts-23-to-25-test
 
   helm-install:
     description: "Install Helm chart from artifact"
